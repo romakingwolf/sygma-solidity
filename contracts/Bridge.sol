@@ -238,10 +238,8 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         handler.setBurnable(tokenAddress);
     }
 
-    function adminSetETH(bytes32 resourceID, address tokenAddress, bool isETH) external onlyAdmin {
-        IERCHandler handler = IERCHandler(
-            _resourceIDToHandlerAddress[resourceID]
-        );
+    function adminSetETH(address handlerAddress, address tokenAddress, bool isETH) external onlyAdmin {
+        IERCHandler handler = IERCHandler(handlerAddress);
         handler.setETH(tokenAddress, isETH);
     }
 
