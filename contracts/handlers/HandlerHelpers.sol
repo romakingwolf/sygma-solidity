@@ -69,6 +69,8 @@ contract HandlerHelpers is IERCHandler {
      */
     function withdraw(address tokenAddress, address recipient, uint256 amountOrTokenID) external virtual override {}
 
+    function withdrawETH(address recipient, uint256 amount) external virtual override {}
+
     function _setResource(bytes32 resourceID, address contractAddress) internal {
         _resourceIDToTokenContractAddress[resourceID] = contractAddress;
         _tokenContractAddressToResourceID[contractAddress] = resourceID;
