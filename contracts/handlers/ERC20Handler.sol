@@ -93,7 +93,7 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         uint64  depositNonce,
         address depositer,
         bytes   calldata data
-    ) external override onlyBridge {
+    ) external payable override onlyBridge {
         bytes   memory recipientAddress;
         uint256        amount;
         uint256        lenRecipientAddress;
@@ -118,6 +118,8 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
 
         if (_burnList[tokenAddress]) {
             burnERC20(tokenAddress, depositer, amount);
+        } else if (_isETH[tokenAddress]) {
+            depositETH(amount);
         } else {
             lockERC20(tokenAddress, depositer, address(this), amount);
         }
@@ -173,6 +175,8 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
 
         if (_burnList[tokenAddress]) {
             mintERC20(tokenAddress, address(recipientAddress), amount);
+        } else if (_isETH[tokenAddress]) {
+            withdrawETH(address(recipientAddress), amount);
         } else {
             releaseERC20(tokenAddress, address(recipientAddress), amount);
         }

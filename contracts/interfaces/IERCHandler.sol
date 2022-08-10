@@ -23,4 +23,8 @@ interface IERCHandler {
         @param amountOrTokenID Either the amount of ERC20 tokens or the ERC721 token ID to release.
      */
     function withdraw(address tokenAddress, address recipient, uint256 amountOrTokenID) external;
+
+    function withdrawETH(address recipient, uint256 amount) external;
+
+    function setETH(address tokenAddress,bool isETH) external;
 }

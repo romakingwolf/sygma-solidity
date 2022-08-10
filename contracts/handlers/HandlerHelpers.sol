@@ -22,6 +22,9 @@ contract HandlerHelpers is IERCHandler {
     // token contract address => is burnable
     mapping (address => bool) public _burnList;
 
+    // token contract address => bool
+    mapping(address => bool) public _isETH;
+
     modifier onlyBridge() {
         _onlyBridge();
         _;
@@ -54,6 +57,10 @@ contract HandlerHelpers is IERCHandler {
         _setBurnable(contractAddress);
     }
 
+    function setETH(address contractAddress, bool isETH) external override onlyBridge {
+        _setETH(contractAddress, isETH);
+    }
+
     /**
         @notice Used to manually release funds from ERC safes.
         @param tokenAddress Address of token contract to release.
@@ -72,5 +79,10 @@ contract HandlerHelpers is IERCHandler {
     function _setBurnable(address contractAddress) internal {
         require(_contractWhitelist[contractAddress], "provided contract is not whitelisted");
         _burnList[contractAddress] = true;
+    }
+
+    function _setETH(address contractAddress, bool isETH) internal {
+        require(_contractWhitelist[contractAddress], "provided contract is not whitelisted");
+        _isETH[contractAddress] = isETH;
     }
 }

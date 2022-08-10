@@ -103,7 +103,8 @@ contract ERC721Handler is IDepositExecute, HandlerHelpers, ERC721Safe {
                     uint64      depositNonce,
                     address     depositer,
                     bytes       calldata data
-                    ) external override onlyBridge {
+                    ) external payable override onlyBridge {
+        require(msg.value == 0, "msg.value != 0");
         uint         lenDestinationRecipientAddress;
         uint         tokenID;
         bytes memory destinationRecipientAddress;

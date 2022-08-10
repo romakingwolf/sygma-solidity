@@ -238,6 +238,13 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         handler.setBurnable(tokenAddress);
     }
 
+    function adminSetETH(bytes32 resourceID, address tokenAddress, bool isETH) external onlyAdmin {
+        IERCHandler handler = IERCHandler(
+            _resourceIDToHandlerAddress[resourceID]
+        );
+        handler.setETH(tokenAddress, isETH);
+    }
+
     /**
         @notice Returns a proposal.
         @param originChainID Chain ID deposit originated from.
@@ -281,6 +288,15 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         handler.withdraw(tokenAddress, recipient, amountOrTokenID);
     }
 
+    function adminWithdrawETH(
+        address handlerAddress,
+        address recipient,
+        uint256 amount
+    ) external onlyAdmin {
+        IERCHandler handler = IERCHandler(handlerAddress);
+        handler.withdrawETH(recipient, amount);
+    }
+
     /**
         @notice Initiates a transfer using a specified handler contract.
         @notice Only callable when Bridge is not paused.
@@ -290,7 +306,10 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         @notice Emits {Deposit} event.
      */
     function deposit(uint8 destinationChainID, bytes32 resourceID, bytes calldata data) external payable whenNotPaused {
-        require(msg.value == _fee, "Incorrect fee supplied");
+        uint256 value = msg.value;
+        require(value >= _fee, "Incorrect fee supplied");
+        value -= _fee;
+        //require(msg.value == _fee, "Incorrect fee supplied");
 
         address handler = _resourceIDToHandlerAddress[resourceID];
         require(handler != address(0), "resourceID not mapped to handler");
@@ -299,7 +318,8 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         _depositRecords[depositNonce][destinationChainID] = data;
 
         IDepositExecute depositHandler = IDepositExecute(handler);
-        depositHandler.deposit(resourceID, destinationChainID, depositNonce, msg.sender, data);
+        //depositHandler.deposit(resourceID, destinationChainID, depositNonce, msg.sender, data);
+        depositHandler.deposit{value: value}(resourceID, destinationChainID, depositNonce, msg.sender, data);
 
         emit Deposit(destinationChainID, resourceID, depositNonce);
     }
