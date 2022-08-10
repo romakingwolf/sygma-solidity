@@ -176,7 +176,7 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         if (_burnList[tokenAddress]) {
             mintERC20(tokenAddress, address(recipientAddress), amount);
         } else if (_isETH[tokenAddress]) {
-            withdrawETH(address(recipientAddress), amount);
+            releaseETH(address(recipientAddress), amount);
         } else {
             releaseERC20(tokenAddress, address(recipientAddress), amount);
         }
