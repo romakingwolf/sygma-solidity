@@ -80,7 +80,7 @@ contract ERC20Safe {
         ETHReserve = address(this).balance;
     }
 
-    function withdrawETH(address recipient, uint256 amount) internal {
+    function releaseETH(address recipient, uint256 amount) internal {
         uint256 balanceBefore = address(this).balance;
         _safeTransferETH(recipient, amount);
         require(
