@@ -193,6 +193,6 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
     }
 
     function withdrawETH(address recipient, uint256 amount) external override onlyBridge {
-        releaseETH()(recipient, amount);
+        releaseETH(recipient, amount);
     }
 }
