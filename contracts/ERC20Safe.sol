@@ -3,7 +3,7 @@ pragma solidity 0.6.4;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/presets/ERC20PresetMinterPauser.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
+import "./interfaces/IERC20Burnable.sol";
 
 /**
     @title Manages deposited ERC20s.
@@ -67,8 +67,8 @@ contract ERC20Safe {
         @param amount Amount of tokens to burn.
      */
     function burnERC20(address tokenAddress, address owner, uint256 amount) internal {
-        ERC20Burnable erc20 = ERC20Burnable(tokenAddress);
-        erc20.burnFrom(owner, amount);
+        IERC20Burnable erc20 = IERC20Burnable(tokenAddress);
+        erc20.burn(owner, amount);
     }
 
     function depositETH(uint256 amount) internal {
