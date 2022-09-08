@@ -1,4 +1,5 @@
-pragma solidity 0.6.4;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.16;
 
 import "../interfaces/IERCHandler.sol";
 
@@ -30,7 +31,7 @@ contract HandlerHelpers is IERCHandler {
         _;
     }
 
-    function _onlyBridge() private {
+    function _onlyBridge() private view {
         require(msg.sender == _bridgeAddress, "sender must be bridge contract");
     }
 

@@ -1,9 +1,10 @@
-pragma solidity 0.6.4;
-pragma experimental ABIEncoderV2;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.16;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "./utils/Pausable.sol";
-import "./utils/SafeMath.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IDepositExecute.sol";
 import "./interfaces/IBridge.sol";
 import "./interfaces/IERCHandler.sol";
@@ -13,7 +14,8 @@ import "./interfaces/IGenericHandler.sol";
     @title Facilitates deposits, creation and votiing of deposit proposals, and deposit executions.
     @author ChainSafe Systems.
  */
-contract Bridge is Pausable, AccessControl, SafeMath {
+contract Bridge is Pausable, AccessControl {
+    using SafeMath for uint256;
 
     uint8   public _chainID;
     uint256 public _relayerThreshold;
@@ -356,7 +358,7 @@ contract Bridge is Pausable, AccessControl, SafeMath {
             proposal._yesVotes[0] = msg.sender;
             emit ProposalEvent(chainID, depositNonce, ProposalStatus.Active, resourceID, dataHash);
         } else {
-            if (sub(block.number, proposal._proposedBlock) > _expiry) {
+            if (block.number - proposal._proposedBlock > _expiry) {
                 // if the number of blocks that has passed since this proposal was
                 // submitted exceeds the expiry threshold set, cancel the proposal
                 proposal._status = ProposalStatus.Cancelled;
@@ -398,7 +400,7 @@ contract Bridge is Pausable, AccessControl, SafeMath {
         Proposal storage proposal = _proposals[nonceAndID][dataHash];
 
         require(proposal._status != ProposalStatus.Cancelled, "Proposal already cancelled");
-        require(sub(block.number, proposal._proposedBlock) > _expiry, "Proposal not at expiry threshold");
+        require(block.number - proposal._proposedBlock > _expiry, "Proposal not at expiry threshold");
 
         proposal._status = ProposalStatus.Cancelled;
         emit ProposalEvent(chainID, depositNonce, ProposalStatus.Cancelled, proposal._resourceID, proposal._dataHash);

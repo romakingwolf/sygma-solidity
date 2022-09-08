@@ -1,4 +1,5 @@
-pragma solidity 0.6.4;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.16;
 
 /**
     @title Interface to be used with handlers that support ERC20s and ERC721s.

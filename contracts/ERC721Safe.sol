@@ -1,8 +1,9 @@
-pragma solidity 0.6.4;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.16;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./ERC721MinterBurnerPauser.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./interfaces/IERC721Ups.sol";
+import "./interfaces/IERC721UpsBurnable.sol";
 
 /**
     @title Manages deposited ERC721s.
@@ -19,7 +20,7 @@ contract ERC721Safe {
         @param tokenID ID of token to transfer.
      */
     function fundERC721(address tokenAddress, address owner, uint tokenID) public {
-        IERC721 erc721 = IERC721(tokenAddress);
+        IERC721Ups erc721 = IERC721Ups(tokenAddress);
         erc721.transferFrom(owner, address(this), tokenID);
     }
 
@@ -31,7 +32,7 @@ contract ERC721Safe {
         @param tokenID ID of token to transfer.
      */
     function lockERC721(address tokenAddress, address owner, address recipient, uint tokenID) internal {
-        IERC721 erc721 = IERC721(tokenAddress);
+        IERC721Ups erc721 = IERC721Ups(tokenAddress);
         erc721.transferFrom(owner, recipient, tokenID);
 
     }
@@ -44,7 +45,7 @@ contract ERC721Safe {
         @param tokenID ID of token to transfer.
      */
     function releaseERC721(address tokenAddress, address owner, address recipient, uint256 tokenID) internal {
-        IERC721 erc721 = IERC721(tokenAddress);
+        IERC721Ups erc721 = IERC721Ups(tokenAddress);
         erc721.transferFrom(owner, recipient, tokenID);
     }
 
@@ -56,8 +57,8 @@ contract ERC721Safe {
         @param data Optional data to send along with mint call.
      */
     function mintERC721(address tokenAddress, address recipient, uint256 tokenID, bytes memory data) internal {
-        ERC721MinterBurnerPauser erc721 = ERC721MinterBurnerPauser(tokenAddress);
-        erc721.mint(recipient, tokenID, string(data));
+        IERC721UpsBurnable erc721 = IERC721UpsBurnable(tokenAddress);
+        erc721.mint(recipient, tokenID);
     }
 
     /**
@@ -66,7 +67,7 @@ contract ERC721Safe {
         @param tokenID ID of token to burn.
      */
     function burnERC721(address tokenAddress, uint256 tokenID) internal {
-        ERC721MinterBurnerPauser erc721 = ERC721MinterBurnerPauser(tokenAddress);
+        IERC721UpsBurnable erc721 = IERC721UpsBurnable(tokenAddress);
         erc721.burn(tokenID);
     }
 

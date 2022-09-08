@@ -1,5 +1,6 @@
-pragma solidity 0.6.4;
-pragma experimental ABIEncoderV2;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.16;
+pragma abicoder v2;
 
 import "../interfaces/IGenericHandler.sol";
 
@@ -41,8 +42,8 @@ contract GenericHandler is IGenericHandler {
         _;
     }
 
-    function _onlyBridge() private {
-         require(msg.sender == _bridgeAddress, "sender must be bridge contract");
+    function _onlyBridge() private view {
+        require(msg.sender == _bridgeAddress, "sender must be bridge contract");
     }
 
     /**
@@ -68,7 +69,7 @@ contract GenericHandler is IGenericHandler {
         address[] memory initialContractAddresses,
         bytes4[]  memory initialDepositFunctionSignatures,
         bytes4[]  memory initialExecuteFunctionSignatures
-    ) public {
+    ) {
         require(initialResourceIDs.length == initialContractAddresses.length,
             "initialResourceIDs and initialContractAddresses len mismatch");
 
