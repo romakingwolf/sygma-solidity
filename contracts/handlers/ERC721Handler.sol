@@ -3,6 +3,7 @@ pragma solidity 0.8.16;
 pragma abicoder v2;
 
 import "../interfaces/IDepositExecute.sol";
+import "../interfaces/IFeeHandler.sol";
 import "./HandlerHelpers.sol";
 import "../ERC721Safe.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
@@ -101,9 +102,10 @@ contract ERC721Handler is IDepositExecute, HandlerHelpers, ERC721Safe {
                     uint8       destinationChainID,
                     uint64      depositNonce,
                     address     depositer,
+                    address     feeHandler,
                     bytes       calldata data
                     ) external payable override onlyBridge {
-        require(msg.value == 0, "msg.value != 0");
+        //require(msg.value == 0, "msg.value != 0");
         uint         lenDestinationRecipientAddress;
         uint         tokenID;
         bytes memory destinationRecipientAddress;
@@ -133,6 +135,20 @@ contract ERC721Handler is IDepositExecute, HandlerHelpers, ERC721Safe {
 
         address tokenAddress = _resourceIDToTokenContractAddress[resourceID];
         require(_contractWhitelist[tokenAddress], "provided tokenAddress is not whitelisted");
+
+        if (feeHandler != address(0)) {
+            IFeeHandler feeHandler = IFeeHandler(feeHandler);
+            uint256 feeAmount;
+            address feeTokenAddress;
+            (feeTokenAddress, feeAmount) = feeHandler.calculateFee(depositer, resourceID);
+
+            if (feeTokenAddress == address(0)) {
+                require(msg.value >= feeAmount, "invalid msg.value");
+                feeHandler.collectFee{value: feeAmount}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
+            } else {
+                feeHandler.collectFee{value: 0}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
+            }
+        }
 
         // Check if the contract supports metadata, fetch it if it does
         if (tokenAddress.supportsInterface(_INTERFACE_ERC721_METADATA)) {

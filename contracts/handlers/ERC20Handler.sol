@@ -3,6 +3,7 @@ pragma solidity 0.8.16;
 pragma abicoder v2;
 
 import "../interfaces/IDepositExecute.sol";
+import "../interfaces/IFeeHandler.sol";
 import "./HandlerHelpers.sol";
 import "../ERC20Safe.sol";
 
@@ -92,8 +93,10 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         uint8   destinationChainID,
         uint64  depositNonce,
         address depositer,
+        address feeHandler,
         bytes   calldata data
     ) external payable override onlyBridge {
+        uint256 value = msg.value;
         bytes   memory recipientAddress;
         uint256        amount;
         uint256        lenRecipientAddress;
@@ -116,9 +119,30 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         address tokenAddress = _resourceIDToTokenContractAddress[resourceID];
         require(_contractWhitelist[tokenAddress], "provided tokenAddress is not whitelisted");
 
+        if (feeHandler != address(0)) {
+            IFeeHandler feeHandler = IFeeHandler(feeHandler);
+            uint256 feeAmount;
+            address feeTokenAddress;
+            (feeTokenAddress, feeAmount) = feeHandler.calculateFee(depositer, resourceID);
+
+            if (feeTokenAddress == tokenAddress) {
+                require(amount > feeAmount, "deposit amount is less than fee amount");
+                amount = amount - feeAmount;
+            }
+
+            if (feeTokenAddress == address(0)) {
+                require(value >= feeAmount, "invalid msg.value");
+                value = value - feeAmount;
+                feeHandler.collectFee{value: feeAmount}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
+            } else {
+                feeHandler.collectFee{value: 0}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
+            }
+        }
+
         if (_burnList[tokenAddress]) {
             burnERC20(tokenAddress, depositer, amount);
         } else if (_isETH[tokenAddress]) {
+            require(value >= amount, "invalid deposit amount");
             depositETH(amount);
         } else {
             lockERC20(tokenAddress, depositer, address(this), amount);

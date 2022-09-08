@@ -9,6 +9,7 @@ import "./interfaces/IDepositExecute.sol";
 import "./interfaces/IBridge.sol";
 import "./interfaces/IERCHandler.sol";
 import "./interfaces/IGenericHandler.sol";
+import "./interfaces/IFeeHandler.sol";
 
 /**
     @title Facilitates deposits, creation and votiing of deposit proposals, and deposit executions.
@@ -20,8 +21,8 @@ contract Bridge is Pausable, AccessControl {
     uint8   public _chainID;
     uint256 public _relayerThreshold;
     uint256 public _totalRelayers;
+    uint256 public _totalFeeSetter;
     uint256 public _totalProposals;
-    uint256 public _fee;
     uint256 public _expiry;
 
     enum Vote {No, Yes}
@@ -48,9 +49,14 @@ contract Bridge is Pausable, AccessControl {
     // destinationChainID + depositNonce => dataHash => relayerAddress => bool
     mapping(uint72 => mapping(bytes32 => mapping(address => bool))) public _hasVotedOnProposal;
 
+    // resourceID => fee handler address
+    mapping(bytes32 => address) public _resourceIDToFeeHandlerAddress;
+
     event RelayerThresholdChanged(uint indexed newThreshold);
     event RelayerAdded(address indexed relayer);
     event RelayerRemoved(address indexed relayer);
+    event FeeSetterAdded(address indexed relayer);
+    event FeeSetterRemoved(address indexed relayer);
     event Deposit(
         uint8   indexed destinationChainID,
         bytes32 indexed resourceID,
@@ -72,6 +78,8 @@ contract Bridge is Pausable, AccessControl {
     );
 
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
+    bytes32 public constant FEE_SETTER_ROLE = keccak256("FEE_SETTER_ROLE");
+    bytes32 public constant FEE_ADMIN_ROLE = keccak256("FEE_ADMIN_ROLE");
 
     modifier onlyAdmin() {
         _onlyAdmin();
@@ -88,6 +96,16 @@ contract Bridge is Pausable, AccessControl {
         _;
     }
 
+    modifier onlyAdminOrFeeSetter() {
+        _onlyAdminOrFeeSetter();
+        _;
+    }
+
+    modifier onlyFeeAdmin() {
+        _onlyFeeAdmin();
+        _;
+    }
+
     function _onlyAdminOrRelayer() private {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(RELAYER_ROLE, msg.sender),
             "sender is not relayer or admin");
@@ -101,6 +119,15 @@ contract Bridge is Pausable, AccessControl {
         require(hasRole(RELAYER_ROLE, msg.sender), "sender doesn't have relayer role");
     }
 
+    function _onlyAdminOrFeeSetter() private {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(FEE_SETTER_ROLE, msg.sender),
+            "sender is not admin or fee setter");
+    }
+
+    function _onlyFeeAdmin() private {
+        require(hasRole(FEE_ADMIN_ROLE, msg.sender), "sender doesn't have fee admin role");
+    }
+
     /**
         @notice Initializes Bridge, creates and grants {msg.sender} the admin role,
         creates and grants {initialRelayers} the relayer role.
@@ -108,10 +135,9 @@ contract Bridge is Pausable, AccessControl {
         @param initialRelayers Addresses that should be initially granted the relayer role.
         @param initialRelayerThreshold Number of votes needed for a deposit proposal to be considered passed.
      */
-    constructor (uint8 chainID, address[] memory initialRelayers, uint initialRelayerThreshold, uint256 fee, uint256 expiry) public {
+    constructor (uint8 chainID, address[] memory initialRelayers, uint initialRelayerThreshold, uint256 expiry) public {
         _chainID = chainID;
         _relayerThreshold = initialRelayerThreshold;
-        _fee = fee;
         _expiry = expiry;
 
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -121,7 +147,6 @@ contract Bridge is Pausable, AccessControl {
             grantRole(RELAYER_ROLE, initialRelayers[i]);
             _totalRelayers++;
         }
-
     }
 
     /**
@@ -195,6 +220,20 @@ contract Bridge is Pausable, AccessControl {
         _totalRelayers--;
     }
 
+    function adminAddFeeSetter(address feeSetterAddress) external onlyAdmin {
+        require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
+        grantRole(FEE_SETTER_ROLE, feeSetterAddress);
+        emit FeeSetterAdded(feeSetterAddress);
+        _totalFeeSetter++;
+    }
+
+    function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
+        require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
+        revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
+        emit FeeSetterRemoved(feeSetterAddress);
+        _totalFeeSetter--;
+    }
+
     /**
         @notice Sets a new resource for handler contracts that use the IERCHandler interface,
         and maps the {handlerAddress} to {resourceID} in {_resourceIDToHandlerAddress}.
@@ -206,6 +245,12 @@ contract Bridge is Pausable, AccessControl {
     function adminSetResource(address handlerAddress, bytes32 resourceID, address tokenAddress) external onlyAdmin {
         _resourceIDToHandlerAddress[resourceID] = handlerAddress;
         IERCHandler handler = IERCHandler(handlerAddress);
+        handler.setResource(resourceID, tokenAddress);
+    }
+
+    function adminSetFeeResource(address handlerAddress, bytes32 resourceID, address tokenAddress) external onlyAdmin {
+        _resourceIDToFeeHandlerAddress[resourceID] = handlerAddress;
+        IFeeHandler handler = IFeeHandler(handlerAddress);
         handler.setResource(resourceID, tokenAddress);
     }
 
@@ -245,6 +290,27 @@ contract Bridge is Pausable, AccessControl {
         handler.setETH(tokenAddress, isETH);
     }
 
+    function setFee(bytes32 resourceID, uint256 amount) external onlyAdminOrFeeSetter {
+        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+        require(handlerAddress != address(0), "handler address is 0x0");
+        IFeeHandler handler = IFeeHandler(handlerAddress);
+        handler.setFee(resourceID, amount);
+    }
+
+    function setUserFee(bytes32 resourceID, address user, uint256 amount, bool isSet) external onlyAdminOrFeeSetter {
+        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+        require(handlerAddress != address(0), "handler address is 0x0");
+        IFeeHandler handler = IFeeHandler(handlerAddress);
+        handler.setUserFee(user, resourceID, amount, isSet);
+    }
+
+    function adminSetFeeAdmin(bytes32 resourceID, address adminAddress) external onlyAdmin {
+        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+        require(handlerAddress != address(0), "handler address is 0x0");
+        IFeeHandler handler = IFeeHandler(handlerAddress);
+        handler.setAdmin(resourceID, adminAddress);
+    }
+
     /**
         @notice Returns a proposal.
         @param originChainID Chain ID deposit originated from.
@@ -259,16 +325,6 @@ contract Bridge is Pausable, AccessControl {
     function getProposal(uint8 originChainID, uint64 depositNonce, bytes32 dataHash) external view returns (Proposal memory) {
         uint72 nonceAndID = (uint72(depositNonce) << 8) | uint72(originChainID);
         return _proposals[nonceAndID][dataHash];
-    }
-
-    /**
-        @notice Changes deposit fee.
-        @notice Only callable by admin.
-        @param newFee Value {_fee} will be updated to.
-     */
-    function adminChangeFee(uint newFee) external onlyAdmin {
-        require(_fee != newFee, "Current fee is equal to new fee");
-        _fee = newFee;
     }
 
     /**
@@ -306,20 +362,17 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {Deposit} event.
      */
     function deposit(uint8 destinationChainID, bytes32 resourceID, bytes calldata data) external payable whenNotPaused {
-        uint256 value = msg.value;
-        require(value >= _fee, "Incorrect fee supplied");
-        value -= _fee;
-        //require(msg.value == _fee, "Incorrect fee supplied");
-
         address handler = _resourceIDToHandlerAddress[resourceID];
         require(handler != address(0), "resourceID not mapped to handler");
 
         uint64 depositNonce = ++_depositCounts[destinationChainID];
         _depositRecords[depositNonce][destinationChainID] = data;
 
+        address feeHandler = _resourceIDToFeeHandlerAddress[resourceID];
+
         IDepositExecute depositHandler = IDepositExecute(handler);
         //depositHandler.deposit(resourceID, destinationChainID, depositNonce, msg.sender, data);
-        depositHandler.deposit{value: value}(resourceID, destinationChainID, depositNonce, msg.sender, data);
+        depositHandler.deposit{value: msg.value}(resourceID, destinationChainID, depositNonce, msg.sender, feeHandler, data);
 
         emit Deposit(destinationChainID, resourceID, depositNonce);
     }
