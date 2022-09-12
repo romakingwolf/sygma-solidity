@@ -245,8 +245,8 @@ contract Bridge is Pausable, AccessControl {
         handler.setResource(resourceID, tokenAddress);
     }
 
-    function adminSetFeeResource(address handlerAddress, bytes32 resourceID, address tokenAddress) external onlyAdmin {
-        _resourceIDToHandlerAddress[resourceID] = handlerAddress;
+    function adminSetFeeResource(bytes32 resourceID, address tokenAddress) external onlyAdmin {
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         IFeeHandler handler = IFeeHandler(handlerAddress);
         handler.setFeeResource(resourceID, tokenAddress);
     }
