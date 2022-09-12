@@ -4,15 +4,15 @@ pragma abicoder v2;
 
 import "../interfaces/IDepositExecute.sol";
 import "../interfaces/IFeeHandler.sol";
-import "./HandlerHelpers.sol";
 import "../ERC20Safe.sol";
+import "./HandlerHelpersWithFee.sol";
 
 /**
     @title Handles ERC20 deposits and deposit executions.
     @author ChainSafe Systems.
     @notice This contract is intended to be used with the Bridge contract.
  */
-contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
+contract ERC20Handler is IDepositExecute, HandlerHelpersWithFee, ERC20Safe {
     struct DepositRecord {
         address _tokenAddress;
         uint8    _lenDestinationRecipientAddress;
@@ -93,7 +93,6 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         uint8   destinationChainID,
         uint64  depositNonce,
         address depositer,
-        address feeHandler,
         bytes   calldata data
     ) external payable override onlyBridge {
         uint256 value = msg.value;
@@ -119,33 +118,25 @@ contract ERC20Handler is IDepositExecute, HandlerHelpers, ERC20Safe {
         address tokenAddress = _resourceIDToTokenContractAddress[resourceID];
         require(_contractWhitelist[tokenAddress], "provided tokenAddress is not whitelisted");
 
-        if (feeHandler != address(0)) {
-            IFeeHandler feeHandler = IFeeHandler(feeHandler);
-            uint256 feeAmount;
-            address feeTokenAddress;
-            (feeTokenAddress, feeAmount) = feeHandler.calculateFee(depositer, resourceID);
-
-            if (feeTokenAddress == tokenAddress) {
-                require(amount > feeAmount, "deposit amount is less than fee amount");
-                amount = amount - feeAmount;
-            }
-
-            if (feeTokenAddress == address(0)) {
-                require(value >= feeAmount, "invalid msg.value");
-                value = value - feeAmount;
-                feeHandler.collectFee{value: feeAmount}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
-            } else {
-                feeHandler.collectFee{value: 0}(depositer, resourceID, destinationChainID, depositNonce, feeAmount);
-            }
-        }
+        uint256 feeAmount;
+        address feeTokenAddress;
+        (feeTokenAddress, feeAmount) = calculateFee(depositer, resourceID, amount);
+        require(feeAmount == 0 || feeTokenAddress == tokenAddress , "fee token contract must be the deposit token contract address");
+        require(amount > feeAmount, "deposit amount must be more than fee amount");
 
         if (_burnList[tokenAddress]) {
+            amount = amount - feeAmount;
             burnERC20(tokenAddress, depositer, amount);
+            collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, false);
         } else if (_isETH[tokenAddress]) {
             require(value >= amount, "invalid deposit amount");
             depositETH(amount);
+            amount = amount - feeAmount;
+            collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, true);
         } else {
             lockERC20(tokenAddress, depositer, address(this), amount);
+            amount = amount - feeAmount;
+            collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, true);
         }
 
         _depositRecords[destinationChainID][depositNonce] = DepositRecord(

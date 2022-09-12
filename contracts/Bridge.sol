@@ -49,9 +49,6 @@ contract Bridge is Pausable, AccessControl {
     // destinationChainID + depositNonce => dataHash => relayerAddress => bool
     mapping(uint72 => mapping(bytes32 => mapping(address => bool))) public _hasVotedOnProposal;
 
-    // resourceID => fee handler address
-    mapping(bytes32 => address) public _resourceIDToFeeHandlerAddress;
-
     event RelayerThresholdChanged(uint indexed newThreshold);
     event RelayerAdded(address indexed relayer);
     event RelayerRemoved(address indexed relayer);
@@ -79,7 +76,7 @@ contract Bridge is Pausable, AccessControl {
 
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     bytes32 public constant FEE_SETTER_ROLE = keccak256("FEE_SETTER_ROLE");
-    bytes32 public constant FEE_ADMIN_ROLE = keccak256("FEE_ADMIN_ROLE");
+    bytes32 public constant FEE_WITHDRAW_ROLE = keccak256("FEE_WITHDRAW_ROLE");
 
     modifier onlyAdmin() {
         _onlyAdmin();
@@ -101,8 +98,8 @@ contract Bridge is Pausable, AccessControl {
         _;
     }
 
-    modifier onlyFeeAdmin() {
-        _onlyFeeAdmin();
+    modifier onlyFeeWithdraw() {
+        _onlyFeeWithdraw();
         _;
     }
 
@@ -124,8 +121,8 @@ contract Bridge is Pausable, AccessControl {
             "sender is not admin or fee setter");
     }
 
-    function _onlyFeeAdmin() private {
-        require(hasRole(FEE_ADMIN_ROLE, msg.sender), "sender doesn't have fee admin role");
+    function _onlyFeeWithdraw() private {
+        require(hasRole(FEE_WITHDRAW_ROLE, msg.sender), "sender must have fee withdraw role");
     }
 
     /**
@@ -249,9 +246,9 @@ contract Bridge is Pausable, AccessControl {
     }
 
     function adminSetFeeResource(address handlerAddress, bytes32 resourceID, address tokenAddress) external onlyAdmin {
-        _resourceIDToFeeHandlerAddress[resourceID] = handlerAddress;
+        _resourceIDToHandlerAddress[resourceID] = handlerAddress;
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setResource(resourceID, tokenAddress);
+        handler.setFeeResource(resourceID, tokenAddress);
     }
 
     /**
@@ -291,24 +288,24 @@ contract Bridge is Pausable, AccessControl {
     }
 
     function setFee(bytes32 resourceID, uint256 amount) external onlyAdminOrFeeSetter {
-        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
         IFeeHandler handler = IFeeHandler(handlerAddress);
         handler.setFee(resourceID, amount);
     }
 
-    function setUserFee(bytes32 resourceID, address user, uint256 amount, bool isSet) external onlyAdminOrFeeSetter {
-        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+    function setFeeRate(bytes32 resourceID, uint256 rate) external onlyAdminOrFeeSetter {
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setUserFee(user, resourceID, amount, isSet);
+        handler.setFeeRate(resourceID, rate);
     }
 
-    function adminSetFeeAdmin(bytes32 resourceID, address adminAddress) external onlyAdmin {
-        address handlerAddress = _resourceIDToFeeHandlerAddress[resourceID];
+    function setUserFee(bytes32 resourceID, address user, uint256 amount, uint256 rate, bool isSet) external onlyAdminOrFeeSetter {
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setAdmin(resourceID, adminAddress);
+        handler.setUserFee(user, resourceID, amount, rate, isSet);
     }
 
     /**
@@ -353,6 +350,16 @@ contract Bridge is Pausable, AccessControl {
         handler.withdrawETH(recipient, amount);
     }
 
+    function withdrawFee(
+        bytes32 resourceID,
+        address payable recipient,
+        uint256 amount
+    ) external onlyFeeWithdraw {
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
+        IFeeHandler handler = IFeeHandler(handlerAddress);
+        handler.withdrawFee(resourceID, recipient, amount);
+    }
+
     /**
         @notice Initiates a transfer using a specified handler contract.
         @notice Only callable when Bridge is not paused.
@@ -368,11 +375,9 @@ contract Bridge is Pausable, AccessControl {
         uint64 depositNonce = ++_depositCounts[destinationChainID];
         _depositRecords[depositNonce][destinationChainID] = data;
 
-        address feeHandler = _resourceIDToFeeHandlerAddress[resourceID];
-
         IDepositExecute depositHandler = IDepositExecute(handler);
         //depositHandler.deposit(resourceID, destinationChainID, depositNonce, msg.sender, data);
-        depositHandler.deposit{value: msg.value}(resourceID, destinationChainID, depositNonce, msg.sender, feeHandler, data);
+        depositHandler.deposit{value: msg.value}(resourceID, destinationChainID, depositNonce, msg.sender, data);
 
         emit Deposit(destinationChainID, resourceID, depositNonce);
     }
