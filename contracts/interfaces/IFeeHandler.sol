@@ -21,6 +21,4 @@ interface IFeeHandler {
 
     function getFeeBalance(bytes32 resourceID) external view returns(uint256);
 
-    function get
-
 }
