@@ -127,8 +127,4 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
         return _resourceIDToAmount[resourceID];
     }
 
-    function getFeeTokenContractAddress(bytes32 resourceID) external view returns(address) {
-        return _resourceIDToFeeTokenContractAddress[resourceID];
-    }
-
 }
