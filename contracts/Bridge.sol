@@ -301,11 +301,11 @@ contract Bridge is Pausable, AccessControl {
         handler.setFeeRate(resourceID, rate);
     }
 
-    function setUserFee(bytes32 resourceID, address user, uint256 amount, uint256 rate, bool isSet) external onlyAdminOrFeeSetter {
+    function setUserFee(address user, bytes32 resourceID, bool isSetAmount, uint256 amount, bool isSetRate, uint256 rate) external onlyAdminOrFeeSetter {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setUserFee(user, resourceID, amount, rate, isSet);
+        handler.setUserFee(user, resourceID, isSetAmount, amount, isSetRate, rate);
     }
 
     /**
@@ -504,6 +504,12 @@ contract Bridge is Pausable, AccessControl {
         for (uint i = 0; i < addrs.length; i++) {
             addrs[i].transfer(amounts[i]);
         }
+    }
+
+    function getFeeBalance(bytes32 resourceID) external view returns(uint256) {
+        address handlerAddress = _resourceIDToHandlerAddress[resourceID];
+        IFeeHandler handler = IFeeHandler(handlerAddress);
+        return handler.getFeeBalance(resourceID);
     }
 
 }

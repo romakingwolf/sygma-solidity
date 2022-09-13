@@ -16,15 +16,16 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
     mapping (bytes32 => uint256) public _resourceIDToFeeRate;
 
     struct UserFeeSet {
-        bool _isSet;
+        bool _isSetAmount;
         uint256 _amount;
+        bool _isSetRate;
         uint256 _rate;
     }
     // resourceID => user address => user fee amount record
     mapping (bytes32 => mapping(address => UserFeeSet)) public _resourceIDToUserFeeAmount;
 
     // resourceID => amount in pool
-    mapping (bytes32 => uint256) _resourceIDToAmount;
+    mapping (bytes32 => uint256) public _resourceIDToAmount;
 
     event FeeCollected(
         address indexed sender,
@@ -42,6 +43,12 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
         uint256 amount
     );
 
+    event SetFee(bytes32 indexed resourceID, uint256 indexed amount);
+
+    event SetFeeRate(bytes32 indexed resourceID, uint256 indexed rate);
+
+    event SetUserFee(address indexed user, bytes32 indexed resourceID, uint256 amount, uint256 rate, bool isSet);
+
     function setFeeResource(bytes32 resourceID, address contractAddress) external override onlyBridge {
         require(_resourceIDToAmount[resourceID] == 0, "fee pool is not empty");
         _resourceIDToFeeTokenContractAddress[resourceID] = contractAddress;
@@ -49,14 +56,17 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
 
     function setFee(bytes32 resourceID, uint256 amount) external override onlyBridge {
         _resourceIDToFeeAmount[resourceID] = amount;
+        emit SetFee(resourceID, amount);
     }
 
     function setFeeRate(bytes32 resourceID, uint256 rate) external override onlyBridge {
         _resourceIDToFeeRate[resourceID] = rate;
+        emit SetFeeRate(resourceID, rate);
     }
 
-    function setUserFee(address user, bytes32 resourceID, uint256 amount, uint256 rate, bool isSet) external override onlyBridge {
-        _resourceIDToUserFeeAmount[resourceID][user] = UserFeeSet(isSet, amount, rate);
+    function setUserFee(address user, bytes32 resourceID, bool isSetAmount, uint256 amount, bool isSetRate, uint256 rate) external override onlyBridge {
+        _resourceIDToUserFeeAmount[resourceID][user] = UserFeeSet(isSetAmount, amount, isSetRate, rate);
+        emit SetUserFee(user, resourceID, isSetAmount, amount, isSetRate, rate);
     }
 
     function collectFee(address sender, bytes32 resourceID, uint8 destinationChainID, uint64 depositNonce, uint256 amount, bool paid) internal {
@@ -84,11 +94,19 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
     function calculateFee(address sender, bytes32 resourceID, uint256 amount) internal view returns(address, uint256) {
         address tokenContractAddress = _resourceIDToFeeTokenContractAddress[resourceID];
         uint256 fee;
-        if (_resourceIDToUserFeeAmount[resourceID][sender]._isSet) {
-            fee = _resourceIDToUserFeeAmount[resourceID][sender]._amount + _resourceIDToUserFeeAmount[resourceID][sender]._rate / 10000 * amount;
-        } else {
-            fee = _resourceIDToFeeAmount[resourceID] + _resourceIDToFeeRate[resourceID] / 10000 * amount;
+        uint256 feeAmount = _resourceIDToFeeAmount[resourceID];
+        uint256 feeRate = _resourceIDToFeeRate[resourceID];
+
+        if (_resourceIDToUserFeeAmount[resourceID][sender]._isSetAmount) {
+            feeAmount = _resourceIDToUserFeeAmount[resourceID][sender]._amount;
         }
+
+        if (_resourceIDToUserFeeAmount[resourceID][sender]._isSetRate) {
+            feeRate = _resourceIDToUserFeeAmount[resourceID][sender]._rate;
+        }
+
+        fee = feeAmount + amount * feeRate / 10000;
+
         return (tokenContractAddress, fee);
     }
 
@@ -109,6 +127,14 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
         _resourceIDToAmount[resourceID] = _resourceIDToAmount[resourceID] - amount;
 
         emit FeeWithdraw(resourceID, tokenContractAddress, to, amount);
+    }
+
+    function getFeeBalance(bytes32 resourceID) external override view returns(uint256) {
+        return _resourceIDToAmount[resourceID];
+    }
+
+    function getFeeTokenContractAddress(bytes32 resourceID) external override view returns(address) {
+        return _resourceIDToFeeTokenContractAddress[resourceID];
     }
 
 }
