@@ -17,8 +17,8 @@ contract Bridge is Pausable, AccessControl {
     uint8   public _chainID;
     uint256 public _relayerThreshold;
     uint256 public _totalRelayers;
-    /*uint256 public _totalFeeSetters;
-    uint256 public _totalFeeWithdrawers;*/
+    uint256 public _totalFeeSetters;
+    uint256 public _totalFeeWithdrawers;
     uint256 public _totalProposals;
     uint256 public _expiry;
 
@@ -49,10 +49,10 @@ contract Bridge is Pausable, AccessControl {
     event RelayerThresholdChanged(uint indexed newThreshold);
     event RelayerAdded(address indexed relayer);
     event RelayerRemoved(address indexed relayer);
-    /*event FeeSetterAdded(address indexed setter);
+    event FeeSetterAdded(address indexed setter);
     event FeeSetterRemoved(address indexed setter);
     event FeeWithdrawerAdded(address indexed withdrawer);
-    event FeeWithdrawerRemoved(address indexed withdrawer);*/
+    event FeeWithdrawerRemoved(address indexed withdrawer);
     event Deposit(
         uint8   indexed destinationChainID,
         bytes32 indexed resourceID,
@@ -221,52 +221,52 @@ contract Bridge is Pausable, AccessControl {
         @notice Only callable by an address that currently do not have the fee setter role.
         @param feeSetterAddress Address of fee setter to be added.
         @notice Emits {FeeSetterAdded} event.
-     *//*
+     */
     function adminAddFeeSetter(address feeSetterAddress) external onlyAdmin {
-        require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
-        grantRole(FEE_SETTER_ROLE, feeSetterAddress);
+        //require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
+        //grantRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterAdded(feeSetterAddress);
         _totalFeeSetters++;
     }
 
-    *//**
+    /**
         @notice Removes fee setter role for {feeSetterAddress} and decreases {_totalFeeSetters} count.
         @notice Only callable by an address that currently has the fee setter role.
         @param feeSetterAddress Address of fee setter to be removed.
         @notice Emits {FeeSetterRemoved} event.
-     *//*
+     */
     function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
-        require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
-        revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
+        //require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
+        //revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterRemoved(feeSetterAddress);
         _totalFeeSetters--;
     }
 
-    *//**
+    /**
         @notice Grants {feeWithdrawerAddress} the fee withdrawer role and increases {_totalFeeWithdrawers} count.
         @notice Only callable by an address that currently do not have the fee withdrawer role.
         @param feeWithdrawerAddress Address of fee withdrawer to be added.
         @notice Emits {FeeWithdrawerAdded} event.
-     *//*
+     */
     function adminAddFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
-        grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        //require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
+        //grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
         emit FeeWithdrawerAdded(feeWithdrawerAddress);
         _totalFeeWithdrawers++;
     }
 
-    *//**
+    /**
         @notice Removes fee withdrawer role for {feeWithdrawerAddress} and decreases {_totalFeeWithdrawers} count.
         @notice Only callable by an address that currently has the fee withdrawer role.
         @param feeWithdrawerAddress Address of fee withdrawer to be removed.
         @notice Emits {FeeWithdrawerRemoved} event.
-     *//*
+     */
     function adminRemoveFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
-        revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        //require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
+        //revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
         emit FeeWithdrawerRemoved(feeWithdrawerAddress);
         _totalFeeWithdrawers--;
-    }*/
+    }
 
     /**
         @notice Sets a new resource for handler contracts that use the IERCHandler interface,
