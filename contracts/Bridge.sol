@@ -249,8 +249,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeWithdrawerAdded} event.
      */
     function adminAddFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        //require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
-        //grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
+        grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
         emit FeeWithdrawerAdded(feeWithdrawerAddress);
         _totalFeeWithdrawers++;
     }
