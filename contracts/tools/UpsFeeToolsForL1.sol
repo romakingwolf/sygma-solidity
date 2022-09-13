@@ -2,45 +2,95 @@
 pragma solidity 0.8.16;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 import './interfaces/ISwapRouterV3.sol';
 
-contract UpsFeeTools {
+contract UpsFeeToolsForL1 is AccessControl {
 
     ISwapRouterV3 public swapRouter;
     address public WETH;
+    address public gasFeeReceipt;
+    address public feeReceipt;
 
     uint24 public constant poolFee = 3000;
 
-    constructor(ISwapRouterV3 _swapRouter, address _WETH) payable {
+    bytes32 public constant ACCOUNTANT_ROLE = keccak256("ACCOUNTANT_ROLE");
+    bytes32 public constant TX_EXECUTOR_ROLE = keccak256("TX_EXECUTOR_ROLE");
+
+    modifier onlyAdmin() {
+        _onlyAdmin();
+        _;
+    }
+
+    modifier onlyAccountant() {
+        _onlyAccountant();
+        _;
+    }
+
+    modifier onlyTxExecutor() {
+        _onlyTxExecutor();
+        _;
+    }
+
+    function _onlyAdmin() private {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "sender doesn't have admin role");
+    }
+
+    function _onlyAccountant() private {
+        require(hasRole(ACCOUNTANT_ROLE, msg.sender), "sender doesn't have accountant role");
+    }
+
+    function _onlyTxExecutor() private {
+        require(hasRole(TX_EXECUTOR_ROLE, msg.sender), "sender doesn't have tx executor role");
+    }
+
+    constructor(ISwapRouterV3 _swapRouter, address _WETH, address _gasFeeReceipt, address _feeReceipt) payable {
         swapRouter = _swapRouter;
+        WETH = _WETH;
+        gasFeeReceipt = _gasFeeReceipt;
+        feeReceipt = _feeReceipt;
+    }
+
+    function setSwapRouter(ISwapRouterV3 _swapRouter) external onlyAdmin {
+        swapRouter = _swapRouter;
+    }
+
+    function setWETH(address _WETH) external onlyAdmin {
         WETH = _WETH;
     }
 
-    function setSwapRouter(ISwapRouterV3 _swapRouter) external {
-        swapRouter = _swapRouter;
+    function setGasFeeReceipt(address _gasFeeReceipt) external onlyAdmin {
+        gasFeeReceipt = _gasFeeReceipt;
     }
 
-    function setWETH(address _WETH) external {
-        WETH = _WETH;
+    function setFeeReceipt(address _feeReceipt) external onlyAdmin {
+        feeReceipt = _feeReceipt;
     }
 
-    function withdraw(address _token, address _receipt, uint256 _amount) external {
+    function withdraw(address _token, address _receipt, uint256 _amount) external onlyAccountant {
         IERC20 token = IERC20(_token);
         token.transfer(_receipt, _amount);
     }
 
-    function withdrawETH(address payable _receipt, uint256 _amount) external {
+    function withdrawETH(address payable _receipt, uint256 _amount) external onlyAccountant {
         _receipt.transfer(_amount);
     }
 
-    function withdrawAndSwapETH(address _token, address _receipt, uint256 _amount) external {
+    // refund fee, eg cpay
+    function refund(address _token, uint256 _amount) external onlyTxExecutor {
+        IERC20 token = IERC20(_token);
+        token.transfer(feeReceipt, _amount);
+    }
+
+    // transfer to relayer to refund ETH gas fee
+    function withdrawAndSwapETH(address _token, uint256 _amount) external onlyTxExecutor {
         IERC20 token = IERC20(_token);
         require(token.balanceOf(address(this)) >= _amount, "out of balance");
 
-        swapExactInputSingleToETH(_amount, _token, WETH, _receipt);
+        swapExactInputSingleToETH(_amount, _token, WETH, gasFeeReceipt);
     }
 
     function swapExactInputSingleToETH(uint256 amountIn, address tokenIn, address tokenOut, address receipt) internal {
