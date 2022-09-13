@@ -223,8 +223,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeSetterAdded} event.
      */
     function adminAddFeeSetter(address feeSetterAddress) external onlyAdmin {
-        //require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
-        //grantRole(FEE_SETTER_ROLE, feeSetterAddress);
+        require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
+        grantRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterAdded(feeSetterAddress);
         _totalFeeSetters++;
     }
@@ -236,8 +236,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeSetterRemoved} event.
      */
     function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
-        //require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
-        //revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
+        require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
+        revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterRemoved(feeSetterAddress);
         _totalFeeSetters--;
     }
@@ -249,8 +249,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeWithdrawerAdded} event.
      */
     function adminAddFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        //require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
-        //grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
+        grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
         emit FeeWithdrawerAdded(feeWithdrawerAddress);
         _totalFeeWithdrawers++;
     }
@@ -262,8 +262,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeWithdrawerRemoved} event.
      */
     function adminRemoveFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        //require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
-        //revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
+        revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
         emit FeeWithdrawerRemoved(feeWithdrawerAddress);
         _totalFeeWithdrawers--;
     }
