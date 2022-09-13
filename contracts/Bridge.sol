@@ -16,11 +16,10 @@ import "./interfaces/IFeeHandler.sol";
 contract Bridge is Pausable, AccessControl {
     uint8   public _chainID;
     uint256 public _relayerThreshold;
-    uint256 public _totalRelayers;
-    uint256 public _totalFeeSetters;
-    uint256 public _totalFeeWithdrawers;
     uint256 public _totalProposals;
     uint256 public _expiry;
+
+    mapping(bytes32 => uint256) public _roleGrantSum;
 
     enum Vote {No, Yes}
 
@@ -47,12 +46,8 @@ contract Bridge is Pausable, AccessControl {
     mapping(uint72 => mapping(bytes32 => mapping(address => bool))) public _hasVotedOnProposal;
 
     event RelayerThresholdChanged(uint indexed newThreshold);
-    event RelayerAdded(address indexed relayer);
-    event RelayerRemoved(address indexed relayer);
-    event FeeSetterAdded(address indexed setter);
-    event FeeSetterRemoved(address indexed setter);
-    event FeeWithdrawerAdded(address indexed withdrawer);
-    event FeeWithdrawerRemoved(address indexed withdrawer);
+    event RoleAdded(bytes32 indexed role, address indexed addr);
+    event RoleRemoved(bytes32 indexed role, address indexed addr);
     event Deposit(
         uint8   indexed destinationChainID,
         bytes32 indexed resourceID,
@@ -141,7 +136,7 @@ contract Bridge is Pausable, AccessControl {
 
         for (uint i; i < initialRelayers.length; i++) {
             grantRole(RELAYER_ROLE, initialRelayers[i]);
-            _totalRelayers++;
+            _roleGrantSum[RELAYER_ROLE]++;
         }
     }
 
@@ -191,81 +186,31 @@ contract Bridge is Pausable, AccessControl {
     }
 
     /**
-        @notice Grants {relayerAddress} the relayer role and increases {_totalRelayer} count.
-        @notice Only callable by an address that currently does not have the admin role.
-        @param relayerAddress Address of relayer to be added.
-        @notice Emits {RelayerAdded} event.
+        @notice Grants user the specified role and increases count.
+        @notice Only callable by an address that currently does not have the role.
+        @param role The keccak256 of the role name.
+        @param addr Address to be added.
+        @notice Emits {RoleAdded} event.
      */
-    function adminAddRelayer(address relayerAddress) external onlyAdmin {
-        require(!hasRole(RELAYER_ROLE, relayerAddress), "addr already has relayer role!");
-        grantRole(RELAYER_ROLE, relayerAddress);
-        emit RelayerAdded(relayerAddress);
-        _totalRelayers++;
+    function adminAddRole(bytes32 role, address addr) external onlyAdmin {
+        require(!hasRole(role, addr), "addr already has the role!");
+        grantRole(role, addr);
+        emit RoleAdded(role, addr);
+        _roleGrantSum[role]++;
     }
 
     /**
-        @notice Removes relayer role for {relayerAddress} and decreases {_totalRelayer} count.
-        @notice Only callable by an address that currently has the admin role.
-        @param relayerAddress Address of relayer to be removed.
-        @notice Emits {RelayerRemoved} event.
+        @notice Revoke user the specified role and decreases count.
+        @notice Only callable by an address that currently have the role.
+        @param role The keccak256 of the role name.
+        @param addr Address to be removed.
+        @notice Emits {RoleRemoved} event.
      */
-    function adminRemoveRelayer(address relayerAddress) external onlyAdmin {
-        require(hasRole(RELAYER_ROLE, relayerAddress), "addr doesn't have relayer role!");
-        revokeRole(RELAYER_ROLE, relayerAddress);
-        emit RelayerRemoved(relayerAddress);
-        _totalRelayers--;
-    }
-
-    /**
-        @notice Grants {feeSetterAddress} the fee setter role and increases {_totalFeeSetters} count.
-        @notice Only callable by an address that currently do not have the fee setter role.
-        @param feeSetterAddress Address of fee setter to be added.
-        @notice Emits {FeeSetterAdded} event.
-     */
-    function adminAddFeeSetter(address feeSetterAddress) external onlyAdmin {
-        //require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
-        //grantRole(FEE_SETTER_ROLE, feeSetterAddress);
-        emit FeeSetterAdded(feeSetterAddress);
-        _totalFeeSetters++;
-    }
-
-    /**
-        @notice Removes fee setter role for {feeSetterAddress} and decreases {_totalFeeSetters} count.
-        @notice Only callable by an address that currently has the fee setter role.
-        @param feeSetterAddress Address of fee setter to be removed.
-        @notice Emits {FeeSetterRemoved} event.
-     */
-    function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
-        require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
-        revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
-        emit FeeSetterRemoved(feeSetterAddress);
-        _totalFeeSetters--;
-    }
-
-    /**
-        @notice Grants {feeWithdrawerAddress} the fee withdrawer role and increases {_totalFeeWithdrawers} count.
-        @notice Only callable by an address that currently do not have the fee withdrawer role.
-        @param feeWithdrawerAddress Address of fee withdrawer to be added.
-        @notice Emits {FeeWithdrawerAdded} event.
-     */
-    function adminAddFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
-        grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
-        emit FeeWithdrawerAdded(feeWithdrawerAddress);
-        _totalFeeWithdrawers++;
-    }
-
-    /**
-        @notice Removes fee withdrawer role for {feeWithdrawerAddress} and decreases {_totalFeeWithdrawers} count.
-        @notice Only callable by an address that currently has the fee withdrawer role.
-        @param feeWithdrawerAddress Address of fee withdrawer to be removed.
-        @notice Emits {FeeWithdrawerRemoved} event.
-     */
-    function adminRemoveFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
-        require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
-        revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
-        emit FeeWithdrawerRemoved(feeWithdrawerAddress);
-        _totalFeeWithdrawers--;
+    function adminRemoveRole(bytes32 role, address addr) external onlyAdmin {
+        require(hasRole(role, addr), "addr doesn't have the role!");
+        revokeRole(role, addr);
+        emit RoleRemoved(role, addr);
+        _roleGrantSum[role]--;
     }
 
     /**
