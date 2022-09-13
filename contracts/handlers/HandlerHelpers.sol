@@ -70,8 +70,22 @@ contract HandlerHelpers is IERCHandler {
      */
     function withdraw(address tokenAddress, address recipient, uint256 amountOrTokenID) external virtual override {}
 
+    /**
+        @notice Used to manually release ETH from ERC20Safe.
+        @param recipient Address to release tokens to.
+        @param amount The amount of ETH to release.
+     */
     function withdrawETH(address recipient, uint256 amount) external virtual override {}
 
+    /**
+        @notice First verifies {_resourceIDToContractAddress}[{resourceID}] and
+        {_contractAddressToResourceID}[{contractAddress}] are not already set,
+        then sets {_resourceIDToContractAddress} with {contractAddress},
+        {_contractAddressToResourceID} with {resourceID},
+        and {_contractWhitelist} to true for {contractAddress}.
+        @param resourceID ResourceID to be used when making deposits.
+        @param contractAddress Address of contract to be called when a deposit is made and a deposited is executed.
+     */
     function _setResource(bytes32 resourceID, address contractAddress) internal {
         _resourceIDToTokenContractAddress[resourceID] = contractAddress;
         _tokenContractAddressToResourceID[contractAddress] = resourceID;
@@ -79,11 +93,21 @@ contract HandlerHelpers is IERCHandler {
         _contractWhitelist[contractAddress] = true;
     }
 
+    /**
+        @notice First verifies {contractAddress} is whitelisted, then sets {_burnList}[{contractAddress}]
+        to true.
+        @param contractAddress Address of contract to be used when making or executing deposits.
+     */
     function _setBurnable(address contractAddress) internal {
         require(_contractWhitelist[contractAddress], "provided contract is not whitelisted");
         _burnList[contractAddress] = true;
     }
 
+    /**
+        @notice Used to set token which is ETH or not.
+        @param contractAddress Token contract address.
+        @param isETH Whether the token is ETH or not.
+     */
     function _setETH(address contractAddress, bool isETH) internal {
         require(_contractWhitelist[contractAddress], "provided contract is not whitelisted");
         _isETH[contractAddress] = isETH;

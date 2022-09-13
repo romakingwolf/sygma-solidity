@@ -70,6 +70,10 @@ contract ERC20Safe {
         erc20.burn(owner, amount);
     }
 
+    /**
+        @notice Used to deposit ETH
+        @param amount Amount of ETH to deposit.
+     */
     function depositETH(uint256 amount) internal {
         require(amount == msg.value, "msg.value and data mismatched");
         require(
@@ -79,6 +83,11 @@ contract ERC20Safe {
         ETHReserve = address(this).balance;
     }
 
+    /**
+        @notice Transfers custody of ETH to recipient.
+        @param recipient Address to transfer ETH to.
+        @param amount Amount of ETH to transfer.
+     */
     function releaseETH(address recipient, uint256 amount) internal {
         uint256 balanceBefore = address(this).balance;
         _safeTransferETH(recipient, amount);
@@ -110,6 +119,11 @@ contract ERC20Safe {
         _safeCall(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
     }
 
+    /**
+        @notice used to transfer ETH safely
+        @param to Address to transfer ETH to
+        @param value Amount of ETH to transfer
+     */
     function _safeTransferETH(address to, uint256 value) private {
         (bool success, bytes memory returndata) = address(to).call{
             value: value

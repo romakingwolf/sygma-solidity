@@ -9,7 +9,6 @@ import "./HandlerHelpersWithFee.sol";
 
 /**
     @title Handles ERC20 deposits and deposit executions.
-    @author ChainSafe Systems.
     @notice This contract is intended to be used with the Bridge contract.
  */
 contract ERC20Handler is IDepositExecute, HandlerHelpersWithFee, ERC20Safe {
@@ -118,6 +117,8 @@ contract ERC20Handler is IDepositExecute, HandlerHelpersWithFee, ERC20Safe {
         address tokenAddress = _resourceIDToTokenContractAddress[resourceID];
         require(_contractWhitelist[tokenAddress], "provided tokenAddress is not whitelisted");
 
+        // get fee amount
+        // fee token contract address must be deposit token contract address
         uint256 feeAmount;
         address feeTokenAddress;
         (feeTokenAddress, feeAmount) = calculateFee(depositer, resourceID, amount);
@@ -125,15 +126,18 @@ contract ERC20Handler is IDepositExecute, HandlerHelpersWithFee, ERC20Safe {
         require(amount > feeAmount, "deposit amount must be more than fee amount");
 
         if (_burnList[tokenAddress]) {
+            // burn deposit amount and transfer fee amount
             amount = amount - feeAmount;
             burnERC20(tokenAddress, depositer, amount);
             collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, false);
         } else if (_isETH[tokenAddress]) {
+            // transfer both deposit amount and fee amount
             require(value >= amount, "invalid deposit amount");
             depositETH(amount);
             amount = amount - feeAmount;
             collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, true);
         } else {
+            // transfer both deposit amount and fee amount
             lockERC20(tokenAddress, depositer, address(this), amount);
             amount = amount - feeAmount;
             collectFee(depositer, resourceID, destinationChainID, depositNonce, feeAmount, true);
@@ -207,6 +211,11 @@ contract ERC20Handler is IDepositExecute, HandlerHelpersWithFee, ERC20Safe {
         releaseERC20(tokenAddress, recipient, amount);
     }
 
+    /**
+        @notice Used to manually release ETH from ERC20Safe.
+        @param recipient Address to release tokens to.
+        @param amount The amount of ETH to release.
+     */
     function withdrawETH(address recipient, uint256 amount) external override onlyBridge {
         releaseETH(recipient, amount);
     }

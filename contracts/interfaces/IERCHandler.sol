@@ -25,7 +25,17 @@ interface IERCHandler {
      */
     function withdraw(address tokenAddress, address recipient, uint256 amountOrTokenID) external;
 
+    /**
+        @notice Used to manually release ETH from ERC20Safe.
+        @param recipient Address to release tokens to.
+        @param amount The amount of ETH to release.
+     */
     function withdrawETH(address recipient, uint256 amount) external;
 
-    function setETH(address tokenAddress,bool isETH) external;
+    /**
+        @notice Used to set token which is ETH or not.
+        @param tokenAddress Token contract address.
+        @param isETH Whether the token is ETH or not.
+     */
+    function setETH(address tokenAddress, bool isETH) external;
 }

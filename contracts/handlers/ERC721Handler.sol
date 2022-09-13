@@ -11,7 +11,6 @@ import "./HandlerHelpersWithFee.sol";
 
 /**
     @title Handles ERC721 deposits and deposit executions.
-    @author ChainSafe Systems.
     @notice This contract is intended to be used with the Bridge contract.
  */
 contract ERC721Handler is IDepositExecute, HandlerHelpersWithFee, ERC721Safe {

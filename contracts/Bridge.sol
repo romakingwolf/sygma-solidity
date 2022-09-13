@@ -4,7 +4,6 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IDepositExecute.sol";
 import "./interfaces/IBridge.sol";
 import "./interfaces/IERCHandler.sol";
@@ -12,16 +11,14 @@ import "./interfaces/IGenericHandler.sol";
 import "./interfaces/IFeeHandler.sol";
 
 /**
-    @title Facilitates deposits, creation and votiing of deposit proposals, and deposit executions.
-    @author ChainSafe Systems.
+    @title Facilitates deposits, creation and voting of deposit proposals, and deposit executions.
  */
 contract Bridge is Pausable, AccessControl {
-    using SafeMath for uint256;
-
     uint8   public _chainID;
     uint256 public _relayerThreshold;
     uint256 public _totalRelayers;
-    uint256 public _totalFeeSetter;
+    uint256 public _totalFeeSetters;
+    uint256 public _totalFeeWithdrawers;
     uint256 public _totalProposals;
     uint256 public _expiry;
 
@@ -52,8 +49,10 @@ contract Bridge is Pausable, AccessControl {
     event RelayerThresholdChanged(uint indexed newThreshold);
     event RelayerAdded(address indexed relayer);
     event RelayerRemoved(address indexed relayer);
-    event FeeSetterAdded(address indexed relayer);
-    event FeeSetterRemoved(address indexed relayer);
+    event FeeSetterAdded(address indexed setter);
+    event FeeSetterRemoved(address indexed setter);
+    event FeeWithdrawerAdded(address indexed withdrawer);
+    event FeeWithdrawerRemoved(address indexed withdrawer);
     event Deposit(
         uint8   indexed destinationChainID,
         bytes32 indexed resourceID,
@@ -76,7 +75,7 @@ contract Bridge is Pausable, AccessControl {
 
     bytes32 public constant RELAYER_ROLE = keccak256("RELAYER_ROLE");
     bytes32 public constant FEE_SETTER_ROLE = keccak256("FEE_SETTER_ROLE");
-    bytes32 public constant FEE_WITHDRAW_ROLE = keccak256("FEE_WITHDRAW_ROLE");
+    bytes32 public constant FEE_WITHDRAWER_ROLE = keccak256("FEE_WITHDRAWER_ROLE");
 
     modifier onlyAdmin() {
         _onlyAdmin();
@@ -122,7 +121,7 @@ contract Bridge is Pausable, AccessControl {
     }
 
     function _onlyFeeWithdraw() private {
-        require(hasRole(FEE_WITHDRAW_ROLE, msg.sender), "sender must have fee withdraw role");
+        require(hasRole(FEE_WITHDRAWER_ROLE, msg.sender), "sender must have fee withdraw role");
     }
 
     /**
@@ -193,7 +192,7 @@ contract Bridge is Pausable, AccessControl {
 
     /**
         @notice Grants {relayerAddress} the relayer role and increases {_totalRelayer} count.
-        @notice Only callable by an address that currently has the admin role.
+        @notice Only callable by an address that currently does not have the admin role.
         @param relayerAddress Address of relayer to be added.
         @notice Emits {RelayerAdded} event.
      */
@@ -217,18 +216,56 @@ contract Bridge is Pausable, AccessControl {
         _totalRelayers--;
     }
 
+    /**
+        @notice Grants {feeSetterAddress} the fee setter role and increases {_totalFeeSetters} count.
+        @notice Only callable by an address that currently do not have the fee setter role.
+        @param feeSetterAddress Address of fee setter to be added.
+        @notice Emits {FeeSetterAdded} event.
+     */
     function adminAddFeeSetter(address feeSetterAddress) external onlyAdmin {
         require(!hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr already has fee setter role!");
         grantRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterAdded(feeSetterAddress);
-        _totalFeeSetter++;
+        _totalFeeSetters++;
     }
 
+    /**
+        @notice Removes fee setter role for {feeSetterAddress} and decreases {_totalFeeSetters} count.
+        @notice Only callable by an address that currently has the fee setter role.
+        @param feeSetterAddress Address of fee setter to be removed.
+        @notice Emits {FeeSetterRemoved} event.
+     */
     function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
         require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
         revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterRemoved(feeSetterAddress);
-        _totalFeeSetter--;
+        _totalFeeSetters--;
+    }
+
+    /**
+        @notice Grants {feeWithdrawerAddress} the fee withdrawer role and increases {_totalFeeWithdrawers} count.
+        @notice Only callable by an address that currently do not have the fee withdrawer role.
+        @param feeWithdrawerAddress Address of fee withdrawer to be added.
+        @notice Emits {FeeWithdrawerAdded} event.
+     */
+    function adminAddFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
+        require(!hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr already has fee withdrawer role!");
+        grantRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        emit FeeWithdrawerAdded(feeWithdrawerAddress);
+        _totalFeeWithdrawers++;
+    }
+
+    /**
+        @notice Removes fee withdrawer role for {feeWithdrawerAddress} and decreases {_totalFeeWithdrawers} count.
+        @notice Only callable by an address that currently has the fee withdrawer role.
+        @param feeWithdrawerAddress Address of fee withdrawer to be removed.
+        @notice Emits {FeeWithdrawerRemoved} event.
+     */
+    function adminRemoveFeeWithdrawer(address feeWithdrawerAddress) external onlyAdmin {
+        require(hasRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress), "addr doesn't have fee withdrawer role!");
+        revokeRole(FEE_WITHDRAWER_ROLE, feeWithdrawerAddress);
+        emit FeeWithdrawerRemoved(feeWithdrawerAddress);
+        _totalFeeWithdrawers--;
     }
 
     /**
@@ -245,10 +282,17 @@ contract Bridge is Pausable, AccessControl {
         handler.setResource(resourceID, tokenAddress);
     }
 
-    function adminSetFeeResource(bytes32 resourceID, address tokenAddress) external onlyAdmin {
+    /**
+        @notice Sets token contract address for a resource.
+        @notice Only callable by an address that currently has the admin role.
+        @param resourceID ResourceID to be used when making deposits.
+        @param tokenAddress Address of contract to be called when a deposit is made and a deposited is executed.
+        @notice in ERC20Handler, fee token must be the deposit token
+     */
+    function adminSetFeeToken(bytes32 resourceID, address tokenAddress) external onlyAdmin {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setFeeResource(resourceID, tokenAddress);
+        handler.setFeeToken(resourceID, tokenAddress);
     }
 
     /**
@@ -282,11 +326,23 @@ contract Bridge is Pausable, AccessControl {
         handler.setBurnable(tokenAddress);
     }
 
+    /**
+        @notice Sets a token as ETH.
+        @notice Only callable by an address that currently has the admin role.
+        @param handlerAddress Address of handler resource will be set for.
+        @param tokenAddress Address of contract to be called when a deposit is made and a deposited is executed.
+     */
     function adminSetETH(address handlerAddress, address tokenAddress, bool isETH) external onlyAdmin {
         IERCHandler handler = IERCHandler(handlerAddress);
         handler.setETH(tokenAddress, isETH);
     }
 
+    /**
+        @notice Sets fee amount for handler contracts that will pay when deposit.
+        @notice Only callable by an address that currently has either the admin role or the fee setter role.
+        @param resourceID ResourceID to be used when making deposits.
+        @param amount Fee amount that pay when deposit.
+     */
     function setFee(bytes32 resourceID, uint256 amount) external onlyAdminOrFeeSetter {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
@@ -294,6 +350,12 @@ contract Bridge is Pausable, AccessControl {
         handler.setFee(resourceID, amount);
     }
 
+    /**
+        @notice Sets fee rate for handler contracts that will pay when deposit.
+        @notice Only callable by an address that currently has either the admin role or the fee setter role.
+        @param resourceID ResourceID to be used when making deposits.
+        @param rate Fee rate that pay when deposit.
+     */
     function setFeeRate(bytes32 resourceID, uint256 rate) external onlyAdminOrFeeSetter {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
@@ -301,11 +363,21 @@ contract Bridge is Pausable, AccessControl {
         handler.setFeeRate(resourceID, rate);
     }
 
-    function setUserFee(address user, bytes32 resourceID, bool isSetAmount, uint256 amount, bool isSetRate, uint256 rate) external onlyAdminOrFeeSetter {
+    /**
+        @notice Sets fee rate for handler contracts that will pay when deposit for a specified user.
+        @notice Only callable by an address that currently has either the admin role or the fee setter role.
+        @param userAddress User Address which user to be set for a specified fee config.
+        @param resourceID ResourceID to be used when making deposits.
+        @param isSetAmount Whether to set a specified fee amount for the user.
+        @param amount Fee amount that pay when deposit for the user.
+        @param isSetRate Whether to set a specified fee rate for the user.
+        @param rate Fee rate that pay when deposit for the user.
+     */
+    function setUserFee(address userAddress, bytes32 resourceID, bool isSetAmount, uint256 amount, bool isSetRate, uint256 rate) external onlyAdminOrFeeSetter {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         require(handlerAddress != address(0), "handler address is 0x0");
         IFeeHandler handler = IFeeHandler(handlerAddress);
-        handler.setUserFee(user, resourceID, isSetAmount, amount, isSetRate, rate);
+        handler.setUserFee(userAddress, resourceID, isSetAmount, amount, isSetRate, rate);
     }
 
     /**
@@ -341,6 +413,12 @@ contract Bridge is Pausable, AccessControl {
         handler.withdraw(tokenAddress, recipient, amountOrTokenID);
     }
 
+    /**
+        @notice Used to manually withdraw ETH funds from ERC safes.
+        @param handlerAddress Address of handler to withdraw from.
+        @param recipient Address to withdraw ETH to.
+        @param amount The amount of ETH to withdraw.
+     */
     function adminWithdrawETH(
         address handlerAddress,
         address recipient,
@@ -350,6 +428,12 @@ contract Bridge is Pausable, AccessControl {
         handler.withdrawETH(recipient, amount);
     }
 
+    /**
+        @notice Used to manually withdraw fee funds.
+        @param resourceID ResourceID to be used when making deposits.
+        @param recipient Address to withdraw fee to.
+        @param amount The amount of fee to withdraw.
+     */
     function withdrawFee(
         bytes32 resourceID,
         address payable recipient,
@@ -506,6 +590,10 @@ contract Bridge is Pausable, AccessControl {
         }
     }
 
+    /**
+        @notice Get fee balance of resource fee pool.
+        @param resourceID ResourceID used to find address of handler to be used for deposit.
+     */
     function getFeeBalance(bytes32 resourceID) external view returns(uint256) {
         address handlerAddress = _resourceIDToHandlerAddress[resourceID];
         IFeeHandler handler = IFeeHandler(handlerAddress);
