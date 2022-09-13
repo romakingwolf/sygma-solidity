@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
+    "@uniswap/v3-periphery": "^1.4.1",
     "commander": "^4.0.1",
     "rimraf": "^3.0.2",
     "truffle": "^5.5.29"

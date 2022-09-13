@@ -43,12 +43,6 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
         uint256 amount
     );
 
-    event SetFee(bytes32 indexed resourceID, uint256 indexed amount);
-
-    event SetFeeRate(bytes32 indexed resourceID, uint256 indexed rate);
-
-    event SetUserFee(address indexed user, bytes32 indexed resourceID, uint256 amount, uint256 rate, bool isSet);
-
     function setFeeResource(bytes32 resourceID, address contractAddress) external override onlyBridge {
         require(_resourceIDToAmount[resourceID] == 0, "fee pool is not empty");
         _resourceIDToFeeTokenContractAddress[resourceID] = contractAddress;
@@ -129,11 +123,11 @@ contract HandlerHelpersWithFee is HandlerHelpers, IFeeHandler {
         emit FeeWithdraw(resourceID, tokenContractAddress, to, amount);
     }
 
-    function getFeeBalance(bytes32 resourceID) external override view returns(uint256) {
+    function getFeeBalance(bytes32 resourceID) external view returns(uint256) {
         return _resourceIDToAmount[resourceID];
     }
 
-    function getFeeTokenContractAddress(bytes32 resourceID) external override view returns(address) {
+    function getFeeTokenContractAddress(bytes32 resourceID) external view returns(address) {
         return _resourceIDToFeeTokenContractAddress[resourceID];
     }
 
