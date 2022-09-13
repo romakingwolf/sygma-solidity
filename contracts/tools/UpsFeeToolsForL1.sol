@@ -2,22 +2,20 @@
 pragma solidity 0.8.16;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-import './interfaces/IBridge.sol';
 import './interfaces/ISwapRouterV3.sol';
 
 contract UpsFeeTools {
 
     ISwapRouterV3 public swapRouter;
-    IBridge public bridge;
     address public WETH;
 
     uint24 public constant poolFee = 3000;
 
-    constructor(ISwapRouterV3 _swapRouter, IBridge _bridge, address _WETH) payable {
+    constructor(ISwapRouterV3 _swapRouter, address _WETH) payable {
         swapRouter = _swapRouter;
-        bridge = _bridge;
         WETH = _WETH;
     }
 
@@ -25,34 +23,27 @@ contract UpsFeeTools {
         swapRouter = _swapRouter;
     }
 
-    function setBridge(IBridge _bridge) external {
-        bridge = _bridge;
-    }
-
     function setWETH(address _WETH) external {
         WETH = _WETH;
     }
 
-    function withdraw(bytes32 _resourceID, address payable _receipt, uint256 _amount) external {
-        uint256 feeBalance = balanceOfFee(_resourceID);
-        require(feeBalance >= _amount, "out of fee balance");
-        bridge.withdrawFee(_resourceID, _receipt, _amount);
+    function withdraw(address _token, address _receipt, uint256 _amount) external {
+        IERC20 token = IERC20(_token);
+        token.transfer(_receipt, _amount);
     }
 
-    function withdrawAndSwapETH(bytes32 _resourceID, address payable _receipt, uint256 _amount) external {
-        uint256 feeBalance = balanceOfFee(_resourceID);
-        require(feeBalance >= _amount, "out of fee balance");
-        bridge.withdrawFee(_resourceID, payable(address(this)), _amount);
-        address tokenIn = bridge.getFeeTokenContractAddress(_resourceID);
-        require(tokenIn != address(0), "swap token address must not be 0x0");
-        swapExactInputSingleToETH(_amount, tokenIn, WETH, address(this));
+    function withdrawETH(address payable _receipt, uint256 _amount) external {
+        _receipt.transfer(_amount);
     }
 
-    function balanceOfFee(bytes32 _resourceID) public view returns(uint256) {
-        return bridge.getFeeBalance(_resourceID);
+    function withdrawAndSwapETH(address _token, address _receipt, uint256 _amount) external {
+        IERC20 token = IERC20(_token);
+        require(token.balanceOf(address(this)) >= _amount, "out of balance");
+
+        swapExactInputSingleToETH(_amount, _token, WETH, _receipt);
     }
 
-    function swapExactInputSingleToETH(uint256 amountIn, address tokenIn, address tokenOut, address receipt) public returns (uint256 amountOut) {
+    function swapExactInputSingleToETH(uint256 amountIn, address tokenIn, address tokenOut, address receipt) internal {
         // address(this) must own the amountIn of tokenIn
 
         // Approve the router to spend tokenIn.
@@ -72,7 +63,7 @@ contract UpsFeeTools {
         });
 
         // The call to `exactInputSingle` executes the swap.
-        amountOut = swapRouter.exactInputSingle(params);
+        uint256 amountOut = swapRouter.exactInputSingle(params);
 
         swapRouter.unwrapWETH9(amountOut, receipt);
     }
