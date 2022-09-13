@@ -236,8 +236,8 @@ contract Bridge is Pausable, AccessControl {
         @notice Emits {FeeSetterRemoved} event.
      */
     function adminRemoveFeeSetter(address feeSetterAddress) external onlyAdmin {
-        //require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
-        //revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
+        require(hasRole(FEE_SETTER_ROLE, feeSetterAddress), "addr doesn't have fee setter role!");
+        revokeRole(FEE_SETTER_ROLE, feeSetterAddress);
         emit FeeSetterRemoved(feeSetterAddress);
         _totalFeeSetters--;
     }
